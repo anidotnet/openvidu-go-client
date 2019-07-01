@@ -3,10 +3,8 @@ package openvidu
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 	"strings"
 )
 
@@ -54,9 +52,9 @@ type tokenRequest struct {
 	KurentoOptions *KurentoOptions `json:"kurentoOptions"`
 }
 
-func NewSession0(vidu *OpenVidu) (*Session, error) {
+func NewSession0(o *OpenVidu) (*Session, error) {
 	session := &Session{
-		openVidu: vidu,
+		openVidu: o,
 		Properties: &SessionProperties{
 			CustomSessionId:        "",
 			MediaMode:              ROUTED,
@@ -160,7 +158,7 @@ func (s *Session) GenerateToken(to *TokenOptions) (string, error) {
 
 		return res.Id, nil
 	}
-	return "", errors.New(strconv.Itoa(statusCode))
+	return "", newOpenViduError(statusCode)
 }
 
 func (s *Session) GetActiveConnections() []*Connection {
@@ -190,7 +188,7 @@ func (s *Session) Close() error {
 	if statusCode == http.StatusNoContent {
 		delete(s.openVidu.activeSessions, s.SessionId)
 	} else {
-		return errors.New(strconv.Itoa(statusCode))
+		return newOpenViduError(statusCode)
 	}
 	return nil
 }
@@ -240,7 +238,7 @@ func (s *Session) Fetch() (bool, error) {
 			return false, nil
 		}
 	} else {
-		return false, errors.New(strconv.Itoa(statusCode))
+		return false, newOpenViduError(statusCode)
 	}
 }
 
@@ -283,7 +281,7 @@ func (s *Session) ForceDisconnectById(connectionId string) error {
 			}
 		}
 	} else {
-		return errors.New(strconv.Itoa(statusCode))
+		return newOpenViduError(statusCode)
 	}
 
 	return nil
@@ -325,7 +323,7 @@ func (s *Session) ForceUnpublishById(streamId string) error {
 			connection.Subscribers = newSubscribers
 		}
 	} else {
-		return errors.New(strconv.Itoa(statusCode))
+		return newOpenViduError(statusCode)
 	}
 	return nil
 }
@@ -425,7 +423,7 @@ func (s *Session) getSessionIdHttp() error {
 	} else if statusCode == http.StatusConflict {
 		s.SessionId = s.Properties.CustomSessionId
 	} else {
-		return errors.New(strconv.Itoa(statusCode))
+		return newOpenViduError(statusCode)
 	}
 	return nil
 }
