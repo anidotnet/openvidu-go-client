@@ -1,9 +1,14 @@
 package openvidu
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -117,5 +122,61 @@ func (o *OpenVidu) CreateSession1(properties *SessionProperties) (*Session, erro
 }
 
 func (o *OpenVidu) StartRecording(sessionId string, properties *RecordingProperties) (*Recording, error) {
+	url := o.hostName + API_RECORDINGS + API_RECORDINGS_START
+	rj := &recordingJson {
+		SessionId: sessionId,
+		Name: properties.Name,
+		OutputMode: properties.OutputMode,
+		HasAudio:properties.HasAudio,
+		HasVideo:properties.HasVideo,
+	}
 
+	if properties.OutputMode == COMPOSED && properties.HasVideo {
+		rj.Resolution = properties.Resolution
+		rj.RecordingLayout = properties.RecordingLayout
+		if properties.RecordingLayout == CUSTOM {
+			rj.CustomLayout = properties.CustomLayout
+		}
+	}
+
+	reqString, err := json.Marshal(rj)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqString))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Basic "+o.basicAuth)
+	response, err := o.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	statusCode := response.StatusCode
+	if statusCode == http.StatusOK {
+		body, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			return nil, err
+		}
+		var rj *recordingJson
+		err = json.Unmarshal(body, &rj)
+		if err != nil {
+			return nil, err
+		}
+
+		r := NewRecording(rj)
+
+		activeSession := o.activeSessions[r.SessionId]
+		if activeSession != nil {
+			activeSession.Recording = true
+		}
+		return r, nil
+	} else {
+		return nil, errors.New(strconv.Itoa(statusCode))
+	}
 }
